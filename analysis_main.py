@@ -68,7 +68,8 @@ def parser_fun():
   )
 
   args = parser.parse_args()
-  pp("args : ", args)
+  pp("args : ")
+  pp(args)
   return args
 
 
@@ -86,7 +87,7 @@ def main():
     __version__ = __version__,
   )
 
-  pp(*config.items())
+  pp(config.items())
   
   path2tensor = lambda path : T.ToTensor()(Image.open(path)).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
@@ -151,7 +152,7 @@ def main():
           ignore_index=True
         )
         wandb.log(log_dict)
-        pprint(log_dict)
+        pp(log_dict)
       wandb.log({"table": df_table})
     exit()
     
