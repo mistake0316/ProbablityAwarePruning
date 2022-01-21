@@ -106,15 +106,16 @@ def main():
     for style_path in config.style_paths:
       style_tensor = path2tensor(style_path)
       code = EST.SP(style_tensor)
-      for pruning_rate, content_path in itertools.product(
+      for pruning_rate, content_path, mode in itertools.product(
         config.pruning_rate_list,
         config.content_paths,
-        config.modes_list
+        config.modes_list,
       ):
         EST.unhook_all()
         EST.prune_ith_layer(
           ith=layer_idx,
           channels=pruning_rate,
+          mode=mode,
         )
         with torch.no_grad():
           content_tensor = path2tensor(content_path)
