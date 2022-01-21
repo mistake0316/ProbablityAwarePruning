@@ -75,7 +75,7 @@ class ElasticStyleTransfer(nn.Module):
       para = sub_module.weight
       dims = list(range(para.dim()))
       dims.remove(0)
-      importance_scores = para.abs(para).mean(dims)
+      importance_scores = para.abs().mean(dims)
     
     
     hook = ProbablityAwarePruningHook(
