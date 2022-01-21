@@ -1,0 +1,7 @@
+# requirement.txt
+pytorch
+torchvision
+torchaudio
+wandb
+pandas
+plotly
