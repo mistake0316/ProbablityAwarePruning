@@ -25,8 +25,8 @@ class ElasticStyleTransfer(nn.Module):
     self._pruning_handles = []
     
   def forward(self, content, style=None, code=None):
-    assert style or code
-    assert not style and code
+    assert (style is not None) or (code is not None)
+    assert not (style is not None) and (code is not None)
 
     G, SP = self.G, self.SP
     if code is None:
