@@ -86,7 +86,7 @@ def main():
     __version__ = __version__,
   )
 
-  pp(*config.items(), sep="\n")
+  pp(*config.items())
   
   path2tensor = lambda path : T.ToTensor()(Image.open(path)).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
