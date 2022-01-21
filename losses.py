@@ -72,6 +72,7 @@ class VGG(torch.nn.Module):
 
 
 vgg16 = vgg = VGG()
+vgg16.to("cuda" if torch.cuda.is_available() else "cpu")
 
 # DEFAULT_CONTENT_WEIGHTS = '{"vgg_16/conv3": 1}'
 def content_loss(
