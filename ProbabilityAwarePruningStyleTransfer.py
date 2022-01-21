@@ -24,7 +24,10 @@ class ElasticStyleTransfer(nn.Module):
     
     self._pruning_handles = []
     
-  def forward(self, content, style, code=None):
+  def forward(self, content, style=None, code=None):
+    assert style or code
+    assert not style and code
+
     G, SP = self.G, self.SP
     if code is None:
       code = SP(
@@ -54,20 +57,33 @@ class ElasticStyleTransfer(nn.Module):
       handle.remove()
     self._pruning_handles = []
 
-  def prune_ith_layer(self, ith, channels=.5, importance_scores=None):
+  def prune_ith_layer(
+    self, ith, channels=.5,
+    mode="bias/abs(scale)",
+    importance_scores=None
+  ):
     module = self.pruneable_modules[ith]
-    hook = ProbablityAwarePruningHook(
-      remain_channels=channels,
-      importance_scores=importance_scores,
-    )
     if len(module._forward_hooks) > 0:
       raise ValueError("hook exist")
-
     sub_module_name = {
       ResidualBlock : "conv1", # conv2 is not considered this time
       UpsampleConvInRelu : "conv",
     }[type(module)]
-    handle = module.get_submodule(sub_module_name).register_forward_hook(hook)
+
+    sub_module = module.get_submodule(sub_module_name)
+    if mode == "L1":
+      para = sub_module.weight
+      dims = list(range(para.dim()))
+      dims.remove(0)
+      importance_scores = para.abs(para).mean(dims)
+    
+    
+    hook = ProbablityAwarePruningHook(
+      remain_channels=channels,
+      mode=mode,
+      importance_scores=importance_scores,
+    )
+    handle = sub_module.register_forward_hook(hook)
     self.pruning_handles.append(handle)
 
     return handle

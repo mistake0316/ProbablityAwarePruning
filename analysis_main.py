@@ -8,8 +8,10 @@ import torch
 from torchvision import transforms as T
 from PIL import Image
 import wandb
+import pandas as pd
 
 from ProbabilityAwarePruningStyleTransfer import ElasticStyleTransfer
+import pruning_utils
 import losses
 
 __version__ = "0.1"
@@ -56,6 +58,13 @@ def parser_fun():
     default=f"{parent_folder}/other_content/*.jpg",
   )
 
+  parser.add_argument(
+    "-m", "--modes_list",
+    help="pruning modes list",
+    nargs="+",
+    default=["L1"]+pruning_utils.available_modes,
+  )
+
   args = parser.parse_args()
   print("args : ", args)
   return args
@@ -71,11 +80,11 @@ def main():
     style_paths = glob.glob(args.style_template),
     pruning_rate_list = args.pruning_rate_list,
     content_paths = glob.glob(args.content_template),
+    modes_list = args.modes_list,
     __version__ = __version__,
   )
 
   print(*config.items(), sep="\n")
-  
   
   path2tensor = lambda path : T.ToTensor()(Image.open(path)).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
@@ -85,26 +94,28 @@ def main():
       layer_idx = layer_idx,
       __version__ = __version__,
     )
-    # run = wandb.init(
-    #   project="ElascitPruningStyleTransfer",
-    #   entity="mistake0316",
-    #   name=f"layer_{layer_idx}",
-    #   config=local_config,
-    # )
-    
+
+    run = wandb.init(
+      project="ElascitPruningStyleTransfer",
+      entity="mistake0316",
+      name=f"layer_{layer_idx}",
+      config=local_config,
+    )
+
+    df_table = pd.DataFrame()
     for style_path in config.style_paths:
       style_tensor = path2tensor(style_path)
       code = EST.SP(style_tensor)
       for pruning_rate, content_path in itertools.product(
         config.pruning_rate_list,
         config.content_paths,
+        config.modes_list
       ):
         EST.unhook_all()
         EST.prune_ith_layer(
           ith=layer_idx,
           channels=pruning_rate,
         )
-        
         with torch.no_grad():
           content_tensor = path2tensor(content_path)
           H, W = content_tensor.shape[2:]
@@ -119,12 +130,24 @@ def main():
           pruning_rate=pruning_rate,
           content_loss=losses.content_loss(result, content_tensor).item(),
           style_loss=losses.style_loss(result, style_tensor).item(),
-          stylized = tensor2wandb_img(result),
-          style = tensor2wandb_img(style_tensor),
-          content = tensor2wandb_img(content_tensor),
+          style_path=style_path,
+          content_path=content_path,
+          images=dict(
+            stylized = tensor2wandb_img(result),
+            style = tensor2wandb_img(style_tensor),
+            content = tensor2wandb_img(content_tensor),
+          ),
         )
-        # wandb.log(log_dict)
+        df_table.append(
+          {
+            k : v for k, v in log_dict.items()
+            if not isinstance(v, dict)
+          },
+          ignore_index=True
+        )
+        wandb.log(log_dict)
         print(log_dict)
+      wandb.log({"table": df_table})
     exit()
     
     

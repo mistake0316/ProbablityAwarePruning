@@ -6,7 +6,8 @@ def ProbablityAwarePruningHook(
     remain_channels:Union[int, float]=1.0,
     mode="bias/abs(scale)",
     importance_scores=None,
-    eps = 1e-5, dim=1
+    eps = 1e-5, dim=1,
+    prune_from_smaller=True,
 ):  
     std_mean_fun = lambda tensor : torch.std_mean(
         tensor,
@@ -14,19 +15,18 @@ def ProbablityAwarePruningHook(
     )
 
     if importance_scores is not None:
-        print("use importance_scores")
         score_fun = lambda *args, **kwargs : importance_scores
     elif mode == "bias/abs(scale)":
         def score_fun(tensor):
             scale, bias = std_mean_fun(tensor)
-            return bias/torch.abs(scale)
+            return bias/(torch.abs(scale)+eps)
     elif mode == "bias":
         def score_fun(tensor):
-            scale, bias = std_mean_fun(tensor)
+            _, bias = std_mean_fun(tensor)
             return bias
     elif mode == "abs(scale)":
         def score_fun(tensor):
-            scale, bias = std_mean_fun(tensor)
+            scale, _ = std_mean_fun(tensor)
             return torch.abs(scale)
     else:
         raise ValueError(f"mode should in {available_modes}, got {mode}")
@@ -43,7 +43,7 @@ def ProbablityAwarePruningHook(
 
         mask = torch.zeros(LEN, device=device)
         score = score_fun(output)
-        mask[torch.topk(score, channels)[1]] = 1
+        mask[torch.topk(score*(prune_from_smaller*2-1), channels)[1]] = 1
         shape = [1,-1] + [1] * (len(output.shape)-2)
         return mask.reshape(*shape)*output
     

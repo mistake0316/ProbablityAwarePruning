@@ -1,5 +1,5 @@
-# requirement.txt
-pytorch
+# requirements.txt
+torch
 torchvision
 torchaudio
 wandb
