@@ -13,6 +13,8 @@ import pandas as pd
 from ProbabilityAwarePruningStyleTransfer import ElasticStyleTransfer
 import pruning_utils
 import losses
+import pprint
+pp = pprint.PrettyPrinter(indent=2).pprint
 
 __version__ = "0.1"
 
@@ -66,7 +68,7 @@ def parser_fun():
   )
 
   args = parser.parse_args()
-  print("args : ", args)
+  pp("args : ", args)
   return args
 
 
@@ -84,7 +86,7 @@ def main():
     __version__ = __version__,
   )
 
-  print(*config.items(), sep="\n")
+  pp(*config.items(), sep="\n")
   
   path2tensor = lambda path : T.ToTensor()(Image.open(path)).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
@@ -133,21 +135,23 @@ def main():
           style_loss=losses.style_loss(result, style_tensor).item(),
           style_path=style_path,
           content_path=content_path,
+          mode=mode,
           images=dict(
             stylized = tensor2wandb_img(result),
             style = tensor2wandb_img(style_tensor),
             content = tensor2wandb_img(content_tensor),
           ),
         )
+        log_dict_for_df = {
+          k : v for k, v in log_dict.items()
+          if not isinstance(v, dict)
+        }
         df_table.append(
-          {
-            k : v for k, v in log_dict.items()
-            if not isinstance(v, dict)
-          },
+          log_dict_for_df,
           ignore_index=True
         )
         wandb.log(log_dict)
-        print(log_dict)
+        pprint(log_dict)
       wandb.log({"table": df_table})
     exit()
     
