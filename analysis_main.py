@@ -165,6 +165,9 @@ def main():
         pp({k:array[-1] for k, array in style_df_dict.items()})
       style_df = pd.DataFrame(style_df_dict)
       wandb.log({"table": style_df})
+
+      # TODO: add plotly for df
+      # TODO: tqdm something
     
     run.finish()
     
