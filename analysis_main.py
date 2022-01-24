@@ -94,7 +94,7 @@ def main():
 
   pp(config.items())
   
-  path2tensor = lambda path : T.ToTensor()(Image.open(path)).unsqueeze(0).to(device)
+  path2tensor = lambda path : T.ToTensor()(Image.open(path).convert("RGB")).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
 
   for layer_idx in config.layers:
