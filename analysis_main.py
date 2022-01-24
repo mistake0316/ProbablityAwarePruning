@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 import glob
 import itertools
 import pathlib
@@ -27,8 +28,8 @@ class EasyDict(dict):
         except KeyError:
             raise AttributeError(name)
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        self[name] = value
+    def __setattr__(self, name: str, dictstyle_df_dict: Any) -> None:
+        self[name] = dictstyle_df_dict
 
     def __delattr__(self, name: str) -> None:
         del self[name]
@@ -113,6 +114,9 @@ def main():
     for style_path in config.style_paths:
       style_tensor = path2tensor(style_path)
       code = EST.SP(style_tensor)
+
+      style_df_dict = defaultdict(list)
+
       for content_path, mode, pruning_rate in itertools.product(
         config.content_paths,
         config.modes_list,
@@ -152,17 +156,15 @@ def main():
             "images", images
           )
         
-        log_dict_for_df = {
-          k : v for k, v in log_dict.items()
-          if not isinstance(v, dict)
-        }
-        df_table.append(
-          log_dict_for_df,
-          ignore_index=True
-        )
+        for k, v in log_dict.items():
+          if not isinstance(v, dict):
+            style_df_dict[k].append(v)
+        
+        
         wandb.log(log_dict)
-        pp(log_dict_for_df)
-      wandb.log({"table": df_table})
+        pp({k:array[-1] for k, array in style_df_dict})
+      style_df = pd.DataFrame(style_df_dict)
+      wandb.log({"table": style_df})
     # exit()
     
     
