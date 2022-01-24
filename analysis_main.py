@@ -162,10 +162,12 @@ def main():
         
         
         wandb.log(log_dict)
-        pp({k:array[-1] for k, array in style_df_dict})
+        pp({k:array[-1] for k, array in style_df_dict.items()})
       style_df = pd.DataFrame(style_df_dict)
       wandb.log({"table": style_df})
-    # exit()
+    
+    run.finish()
+    
     
     
 
