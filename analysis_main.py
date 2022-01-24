@@ -67,6 +67,10 @@ def parser_fun():
     default=["L1"]+pruning_utils.available_modes,
   )
 
+  parser.add_argument('--save-image', dest='save_image_flag', action='store_true')
+  parser.add_argument('--no-save-image', dest='save_image_flag', action='store_false')
+  parser.set_defaults(feature=False)
+
   args = parser.parse_args()
   pp("args : ")
   pp(args)
@@ -109,10 +113,10 @@ def main():
     for style_path in config.style_paths:
       style_tensor = path2tensor(style_path)
       code = EST.SP(style_tensor)
-      for pruning_rate, content_path, mode in itertools.product(
-        config.pruning_rate_list,
+      for content_path, mode, pruning_rate in itertools.product(
         config.content_paths,
         config.modes_list,
+        config.pruning_rate_list,
       ):
         EST.unhook_all()
         EST.prune_ith_layer(
@@ -137,12 +141,17 @@ def main():
           style_path=style_path,
           content_path=content_path,
           mode=mode,
+        )
+        if args.save_image_flag:
           images=dict(
             stylized = tensor2wandb_img(result),
             style = tensor2wandb_img(style_tensor),
             content = tensor2wandb_img(content_tensor),
-          ),
-        )
+          )
+          log_dict.update(
+            "images", images
+          )
+        
         log_dict_for_df = {
           k : v for k, v in log_dict.items()
           if not isinstance(v, dict)
@@ -152,9 +161,9 @@ def main():
           ignore_index=True
         )
         wandb.log(log_dict)
-        pp(log_dict)
+        pp(log_dict_for_df)
       wandb.log({"table": df_table})
-    exit()
+    # exit()
     
     
 
