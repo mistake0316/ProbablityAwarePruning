@@ -69,7 +69,7 @@ def parser_fun():
 
   parser.add_argument('--save-image', dest='save_image_flag', action='store_true')
   parser.add_argument('--no-save-image', dest='save_image_flag', action='store_false')
-  parser.set_defaults(feature=False)
+  parser.set_defaults(save_image_flag=False)
 
   args = parser.parse_args()
   pp("args : ")
