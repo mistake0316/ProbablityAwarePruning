@@ -45,7 +45,7 @@ def parser_fun():
     "-p", "--pruning_rate_list",
     help="grid of pruning rate list",
     nargs="+",
-    default=[1.0, 0.8, 0.6, 0.4, .2],
+    default=[0, .2, .4, .6, .8],
     type=float,
   )
 
@@ -83,7 +83,7 @@ def main():
   EST = elastic_model = ElasticStyleTransfer().to(device)
 
   args = parser_fun()
-  config = EasyDict(
+  base_config = EasyDict(
     layers = list(EST.pruneable_modules.keys()),
     style_paths = glob.glob(args.style_template),
     pruning_rate_list = args.pruning_rate_list,
@@ -92,88 +92,103 @@ def main():
     __version__ = __version__,
   )
 
-  pp(config.items())
+  pp(base_config)
   
   path2tensor = lambda path : T.ToTensor()(Image.open(path).convert("RGB")).unsqueeze(0).to(device)
   tensor2wandb_img = lambda tensor : wandb.Image(T.ToPILImage()(tensor[0].cpu()))
 
-  for layer_idx in config.layers:
-    local_config = EasyDict(
+  run = wandb.init(
+    project="ElascitPruningStyleTransfer",
+    entity="mistake0316",
+    name=base_config.__version__,
+    config=base_config,
+  )
+
+  all_code = []
+  for style_path in base_config.style_paths:
+    with torch.no_grad():
+      style_tensor = EST.style_preprocess(path2tensor(style_path))
+      all_code.append(EST.SP(style_tensor))
+    
+  all_code = torch.concat(all_code)
+
+  for layer_idx in base_config.layers:
+    layer_config = EasyDict(
       layer_idx = layer_idx,
-      __version__ = __version__,
     )
 
-    run = wandb.init(
-      project="ElascitPruningStyleTransfer",
-      entity="mistake0316",
-      name=f"layer_{layer_idx}",
-      config=local_config,
-    )
+    df_dict = defaultdict(list)
 
-    df_table = pd.DataFrame()
-    for style_path in config.style_paths:
-      style_tensor = path2tensor(style_path)
-      code = EST.SP(style_tensor)
-
-      style_df_dict = defaultdict(list)
-
-      for content_path, mode, pruning_rate in itertools.product(
-        config.content_paths,
-        config.modes_list,
-        config.pruning_rate_list,
-      ):
-        EST.unhook_all()
-        EST.prune_ith_layer(
-          ith=layer_idx,
-          channels=pruning_rate,
-          mode=mode,
+    for content_path, mode, pruning_rate, prune_from_smaller in itertools.product(
+      base_config.content_paths,
+      base_config.modes_list,
+      base_config.pruning_rate_list,
+      [True, False],
+    ):
+      EST.unhook_all()
+      EST.prune_ith_layer(
+        ith=layer_idx,
+        remain_channels=1-pruning_rate,
+        mode=mode,
+        prune_from_smaller=prune_from_smaller,
+      )
+      with torch.no_grad():
+        content_tensor = path2tensor(content_path)
+        H, W = content_tensor.shape[2:]
+        content_tensor = content_tensor[:, :, :H-H%32, :W-W%32]
+        
+        result = EST.forward(
+          content_tensor,
+          code=all_code,
         )
-        with torch.no_grad():
-          content_tensor = path2tensor(content_path)
-          H, W = content_tensor.shape[2:]
-          content_tensor = content_tensor[:, :, :H-H%32, :W-W%32]
-          
-          result = EST.forward(
-            content_tensor,
-            code=code,
-          )
-
-        log_dict = dict(
+      
+      log_dict = dict()
+      log_dict.update(
+        layer_config
+      )
+      log_dict.update(
+        dict(
           pruning_rate=pruning_rate,
           content_loss=losses.content_loss(result, content_tensor).item(),
           style_loss=losses.style_loss(result, style_tensor).item(),
           style_path=style_path,
           content_path=content_path,
           mode=mode,
+          from_smaller_flag=prune_from_smaller,
         )
-        if args.save_image_flag:
-          images=dict(
-            stylized = tensor2wandb_img(result),
-            style = tensor2wandb_img(style_tensor),
-            content = tensor2wandb_img(content_tensor),
-          )
-          log_dict.update(
-            "images", images
-          )
-        
-        for k, v in log_dict.items():
-          if not isinstance(v, dict):
-            style_df_dict[k].append(v)
-        
-        
-        wandb.log(log_dict)
-        pp({k:array[-1] for k, array in style_df_dict.items()})
-      style_df = pd.DataFrame(style_df_dict)
-      wandb.log({"table": style_df})
+      )
+      
+      if args.save_image_flag:
+        images = dict(
+          stylized = tensor2wandb_img(result),
+          style = tensor2wandb_img(style_tensor),
+          content = tensor2wandb_img(content_tensor),
+        )
+        log_dict.update(
+          "images", images
+        )
+      
+      for k, v in log_dict.items():
+        if not isinstance(v, dict):
+          df_dict[k].append(v)
+      
+      
+      wandb.log(log_dict)
+      pp({k:array[-1] for k, array in df_dict.items()})
+    style_df = pd.DataFrame(df_dict)
+    wandb.log({f"table_{layer_idx}": df_dict})
 
-      # TODO: add plotly for df
-      # TODO: tqdm something
+    # TODO : add plotly for df
+    # TODO : tqdm something
+    # TODO : postorder something
+    # TODO : batchfiy style code
     
-    run.finish()
+  run.finish()
     
     
     
 
 
 if __name__ == "__main__":
-  main()
+  with torch.no_grad():
+    main()

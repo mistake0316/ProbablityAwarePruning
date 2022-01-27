@@ -80,14 +80,17 @@ class ResidualBlock(nn.Module):
     self.channels = channels
 
     self.reflection_pad = nn.ReflectionPad2d(1)
-    self.conv1 = nn.Conv2d(channels,channels,3,stride=1,padding=0, bias=False)
     self.instancenorm = nn.InstanceNorm2d(channels)
-    self.fc_beta1 = nn.Linear(768,channels)
+
     self.fc_gamma1 = nn.Linear(768,channels)
-    self.fc_beta2 = nn.Linear(768,channels)
-    self.fc_gamma2 = nn.Linear(768,channels)
+    self.fc_beta1 = nn.Linear(768,channels)
+    self.conv1 = nn.Conv2d(channels,channels,3,stride=1,padding=0, bias=False)
     self.relu = nn.ReLU(inplace=False)
+
+    self.fc_gamma2 = nn.Linear(768,channels)
+    self.fc_beta2 = nn.Linear(768,channels)
     self.conv2 = nn.Conv2d(channels,channels,3,stride=1,padding=0, bias=False)
+    
     
   def forward(self, x, style):
     # x: B x C x H x W  
