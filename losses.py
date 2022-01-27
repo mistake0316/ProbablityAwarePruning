@@ -87,9 +87,10 @@ def content_loss(
   out_dict_1 = vgg16(tensor1, layers)
   out_dict_2 = vgg16(tensor2, layers)
 
-  loss = 0
+  losses = []
   for w, l in zip(weights, layers):
-    loss += w*torch.mean((out_dict_1[l]-out_dict_2[l])**2)
+    losses.append(w*torch.mean((out_dict_1[l]-out_dict_2[l])**2, dim=(1,2,3)))
+  loss = torch.stack(losses).mean(axis=0)
   return loss
 
 
@@ -115,22 +116,17 @@ def style_loss(
   out_dict_1 = vgg16(tensor1, layers)
   out_dict_2 = vgg16(tensor2, layers)
 
-  loss = 0
+  losses = []
   for w, l in zip(weights, layers):
     gram_1 = gram_matrix(out_dict_1[l])
     gram_2 = gram_matrix(out_dict_2[l])
-    loss += w*torch.mean((gram_1-gram_2)**2)
-  return loss
+    losses.append(w*torch.mean((gram_1-gram_2)**2, dim=(1,2)))
+  return torch.stack(losses, dim=0).mean(dim=0)
 
 if __name__ == "__main__":
   print(vgg.layer_names)
-  tensors = [
-    T.Resize(384)(T.ToTensor()(Image.open("doge.jpg")).unsqueeze(0))
-  ]
-  tensors.append(
-    tensors[0]+torch.rand_like(tensors[0])*.1
-  )
+  tensors = torch.rand((2,2,3,256,256))
   
   with torch.no_grad():
-    print(f"content loss : {content_loss(*tensors).item()}")
-    print(f"style loss : {style_loss(*tensors).item()}")
+    print(f"content loss : {content_loss(*tensors).cpu().numpy()}")
+    print(f"style loss : {style_loss(*tensors).cpu().numpy()}")

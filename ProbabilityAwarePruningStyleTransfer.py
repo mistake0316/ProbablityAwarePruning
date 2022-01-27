@@ -87,7 +87,6 @@ class ElasticStyleTransfer(nn.Module):
       dims.remove(0)
       importance_scores = para.abs().mean(dims)
       
-    
     hook = ProbablityAwarePruningHook(
       remain_channels=remain_channels,
       mode=mode,

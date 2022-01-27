@@ -105,15 +105,21 @@ def main():
   )
 
   all_code = []
+  style_tensor_list = []
   for style_path in base_config.style_paths:
     with torch.no_grad():
       style_tensor = EST.style_preprocess(path2tensor(style_path))
+      style_tensor_list.append(style_tensor)
       all_code.append(EST.SP(style_tensor))
     
   all_code = torch.concat(all_code)
 
+  ## Nested by 
+  # layer_idx
+  # content_path, mode, pruning_rate, prune_from_smaller
+  # style_path
   for layer_idx in base_config.layers:
-    layer_config = EasyDict(
+    current_dict = layer_config = EasyDict(
       layer_idx = layer_idx,
     )
 
@@ -142,41 +148,47 @@ def main():
           code=all_code,
         )
       
-      log_dict = dict()
-      log_dict.update(
-        layer_config
-      )
-      log_dict.update(
-        dict(
+      current_dict = log_dict = dict(
           pruning_rate=pruning_rate,
-          content_loss=losses.content_loss(result, content_tensor).item(),
-          style_loss=losses.style_loss(result, style_tensor).item(),
-          style_path=style_path,
           content_path=content_path,
           mode=mode,
           from_smaller_flag=prune_from_smaller,
         )
+      log_dict.update(
+        layer_config
       )
-      
-      if args.save_image_flag:
-        images = dict(
-          stylized = tensor2wandb_img(result),
-          style = tensor2wandb_img(style_tensor),
-          content = tensor2wandb_img(content_tensor),
+
+      content_losses = losses.content_loss(result, content_tensor).cpu().numpy()
+      style_losses = losses.style_loss(result, style_tensor).cpu().numpy()
+      for ith_style, style_path, in  enumerate(
+        base_config.style_paths,
+      ):
+        current_dict = loss_dict = dict(
+          style_path=style_path,
+          content_loss=content_losses[ith_style],
+          style_loss=style_losses[ith_style],
         )
-        log_dict.update(
-          "images", images
-        )
+        loss_dict.update(log_dict)
+
+        if args.save_image_flag:
+          images = dict(
+            stylized = tensor2wandb_img(result[ith_style]),
+            style = tensor2wandb_img(style_tensor_list[ith_style]),
+            content = tensor2wandb_img(content_tensor[ith_style]),
+          )
+          current_dict.update(
+            "images", images
+          )
       
-      for k, v in log_dict.items():
-        if not isinstance(v, dict):
-          df_dict[k].append(v)
-      
-      
-      wandb.log(log_dict)
-      pp({k:array[-1] for k, array in df_dict.items()})
-    style_df = pd.DataFrame(df_dict)
-    wandb.log({f"table_{layer_idx}": df_dict})
+        for k, v in current_dict.items():
+          if not isinstance(v, dict):
+            df_dict[k].append(v)
+        
+        wandb.log(current_dict)
+
+        pp({k:val for k, val in filter(lambda x: not isinstance(x[1], dict), current_dict.items())})
+    df = pd.DataFrame(df_dict)
+    wandb.log({f"table_{layer_idx}": df})
 
     # TODO : add plotly for df
     # TODO : tqdm something
