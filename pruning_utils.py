@@ -16,7 +16,7 @@ def ProbablityAwarePruningHook( # for convolution
     )
 
     if importance_scores is not None:
-        score_fun = lambda *args, **kwargs : importance_scores
+        score_fun = lambda *args, **kwargs : importance_scores * (prune_from_smaller*2-1)
     elif mode in available_modes:
         def score_fun(tensor, mode=mode):
             scale, bias = std_mean_fun(tensor)
