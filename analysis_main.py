@@ -3,7 +3,7 @@ from collections import defaultdict
 import glob
 import itertools
 import pathlib
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Tuple, Union, Dict
 
 import torch
 from torchvision import transforms as T
@@ -14,25 +14,11 @@ import pandas as pd
 from ProbabilityAwarePruningStyleTransfer import ElasticStyleTransfer
 import pruning_utils
 import losses
+import plot_utils
 import pprint
 pp = pprint.PrettyPrinter(indent=2).pprint
 
-__version__ = "0.1"
-
-class EasyDict(dict):
-    """Convenience class that behaves like a dict but allows access with the attribute syntax."""
-
-    def __getattr__(self, name: str) -> Any:
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError(name)
-
-    def __setattr__(self, name: str, dictstyle_df_dict: Any) -> None:
-        self[name] = dictstyle_df_dict
-
-    def __delattr__(self, name: str) -> None:
-        del self[name]
+__version__ = "0.2.add_plotly"
 
 def parser_fun():
   parent_folder = pathlib.Path(__file__).parent
@@ -45,7 +31,7 @@ def parser_fun():
     "-p", "--pruning_rate_list",
     help="grid of pruning rate list",
     nargs="+",
-    default=[0, .2, .4, .6, .8],
+    default=[.0, .2, .4, .6, .8],
     type=float,
   )
 
@@ -78,12 +64,14 @@ def parser_fun():
   return args
 
 
+
+
 def main():
   device = "cuda" if torch.cuda.is_available() else "cpu"
   EST = elastic_model = ElasticStyleTransfer().to(device)
 
   args = parser_fun()
-  base_config = EasyDict(
+  base_config = dict(
     layers = list(EST.pruneable_modules.keys()),
     style_paths = glob.glob(args.style_template),
     pruning_rate_list = args.pruning_rate_list,
@@ -100,13 +88,13 @@ def main():
   run = wandb.init(
     project="ElascitPruningStyleTransfer",
     entity="mistake0316",
-    name=base_config.__version__,
+    name=base_config["__version__"],
     config=base_config,
   )
 
   all_code = []
   style_tensor_list = []
-  for style_path in base_config.style_paths:
+  for style_path in base_config["style_paths"]:
     with torch.no_grad():
       style_tensor = EST.style_preprocess(path2tensor(style_path))
       style_tensor_list.append(style_tensor)
@@ -118,17 +106,17 @@ def main():
   # layer_idx
   # content_path, mode, pruning_rate, prune_from_smaller
   # style_path
-  for layer_idx in base_config.layers:
-    current_dict = layer_config = EasyDict(
+  for layer_idx in base_config["layers"]:
+    current_dict = layer_config = dict(
       layer_idx = layer_idx,
     )
 
     df_dict = defaultdict(list)
 
     for content_path, mode, pruning_rate, prune_from_smaller in itertools.product(
-      base_config.content_paths,
-      base_config.modes_list,
-      base_config.pruning_rate_list,
+      base_config["content_paths"],
+      base_config["modes_list"],
+      base_config["pruning_rate_list"],
       [True, False],
     ):
       EST.unhook_all()
@@ -154,14 +142,14 @@ def main():
           mode=mode,
           from_smaller_flag=prune_from_smaller,
         )
-      log_dict.update(
+      current_dict.update(
         layer_config
       )
 
       content_losses = losses.content_loss(result, content_tensor).cpu().numpy()
       style_losses = losses.style_loss(result, style_tensor).cpu().numpy()
       for ith_style, style_path, in  enumerate(
-        base_config.style_paths,
+        base_config["style_paths"],
       ):
         current_dict = loss_dict = dict(
           style_path=style_path,
@@ -188,12 +176,21 @@ def main():
 
         pp({k:val for k, val in filter(lambda x: not isinstance(x[1], dict), current_dict.items())})
     df = pd.DataFrame(df_dict)
-    wandb.log({f"table_{layer_idx}": df})
+    wandb.log(
+      {
+        f"table_layer_{layer_idx}": df,
+        **{
+          f"plotly_{fig_notation}":fig
+          for fig_notation, fig in plot_utils.get_plotly_fig(
+            df,
+            title_prefix=f"layer_idx_{layer_idx}",
+          ).itmes()
+        }
+      }
+    )
 
-    # TODO : add plotly for df
     # TODO : tqdm something
     # TODO : postorder something
-    # TODO : batchfiy style code
     
   run.finish()
     
