@@ -184,7 +184,7 @@ def main():
           for fig_notation, fig in plot_utils.get_plotly_fig(
             df,
             title_prefix=f"layer_idx_{layer_idx}",
-          ).itmes()
+          ).items()
         }
       }
     )
