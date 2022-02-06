@@ -13,7 +13,6 @@ from ProbabilityAwarePruningStyleTransfer import ElasticStyleTransfer
 import pprint
 pp = pprint.PrettyPrinter(indent=2).pprint
 
-import plotly.express as px
 import os
 from typing import Any, List, Tuple, Union, Dict
 import pandas as pd
@@ -229,8 +228,8 @@ if __name__ == "__main__":
   
     # for row, fig in enumerate(figs.values()):
     #   fig.show()
-
-    if True:
+    wandb_flag = True
+    if wandb_flag:
       import wandb
       run = wandb.init(
         project="test_add_plotly",
@@ -238,11 +237,14 @@ if __name__ == "__main__":
       )
       
       new_dict = {
-        f"plotly_{k}":fig for k, fig in figs.items()
+        f"plotly_{k}":wandb.Html(fig.to_html()) for k, fig in figs.items()
       }
       wandb.log(
         new_dict
       )
+    else:
+      for fig in figs.values():
+        fig.show()
 
 
 

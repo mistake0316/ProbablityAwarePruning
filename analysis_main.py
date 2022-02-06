@@ -180,7 +180,8 @@ def main():
       {
         f"table_layer_{layer_idx}": df,
         **{
-          f"plotly_{fig_notation}":fig
+          # does not appear filled area without using html format
+          f"plotly_{fig_notation}":wandb.Html(fig.to_html()) 
           for fig_notation, fig in plot_utils.get_plotly_fig(
             df,
             title_prefix=f"layer_idx_{layer_idx}",
@@ -191,7 +192,7 @@ def main():
 
     # TODO : tqdm something
     # TODO : postorder something
-    
+    # TODO : print level
   run.finish()
     
     
