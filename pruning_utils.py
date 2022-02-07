@@ -1,6 +1,6 @@
 import torch
 from typing import Union
-available_modes = ["bias/abs(scale)", "abs(scale)", "bias", "first_n_layer"]
+available_modes = ["bias/abs(scale)", "abs(scale)", "bias", "from_first_layers"]
 
 def ProbablityAwarePruningHook( # for convolution
     remain_channels:Union[int, float]=1.0,
