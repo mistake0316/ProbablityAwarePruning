@@ -1,6 +1,6 @@
 import torch
 from typing import Union
-available_modes = ["bias/abs(scale)", "abs(scale)", "bias"]
+available_modes = ["bias/abs(scale)", "abs(scale)", "bias", "first_n_layer"]
 
 def ProbablityAwarePruningHook( # for convolution
     remain_channels:Union[int, float]=1.0,
@@ -20,15 +20,16 @@ def ProbablityAwarePruningHook( # for convolution
     elif mode in available_modes:
         def score_fun(tensor, mode=mode):
             scale, bias = std_mean_fun(tensor)
-            if mode == "bias/abs(scale)":
-                score = bias/(torch.abs(scale)+eps)
-            elif mode == "bias":
-                score = bias
-            elif mode == "abs(scale)":
-                score = torch.abs(scale)
-            else:
-                NotImplementedError()
-            return score * (prune_from_smaller*2-1)
+            original_score = {
+                "bias/abs(scale)":bias/(torch.abs(scale)+eps),
+                "bias":bias,
+                "abs(scale)":torch.abs(scale),
+                "from_first_layers":torch.arange(tensor.shape[1]),
+            }.get(mode, None)
+            if original_score is None:
+                raise NotImplementedError()
+
+            return original_score * (prune_from_smaller*2-1)
     else:
         raise ValueError(f"mode should in {available_modes}, got {mode}")
     
@@ -57,7 +58,7 @@ def ProbablityAwarePruningHook( # for convolution
         )
         mask[(batch_indices.reshape(-1), indices.reshape(-1))] = 1
         shape = [B,-1] + [1] * (len(output.shape)-2)
-        return mask.view(*shape)*output
+        return mask.view(*shape) * output
     
     return inner_hook
     

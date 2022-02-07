@@ -18,7 +18,7 @@ import plot_utils
 import pprint
 pp = pprint.PrettyPrinter(indent=2).pprint
 
-__version__ = "0.2.add_plotly"
+__version__ = "0.2.1 : add plotly & add prune from first"
 
 def parser_fun():
   parent_folder = pathlib.Path(__file__).parent
@@ -40,7 +40,7 @@ def parser_fun():
     help="style images template",
     default=f"{parent_folder}/style_images/*.jpg",
   )
-  
+
   parser.add_argument(
     "-c", "--content_template",
     help="content images template",
@@ -175,12 +175,17 @@ def main():
         wandb.log(current_dict)
 
         pp({k:val for k, val in filter(lambda x: not isinstance(x[1], dict), current_dict.items())})
+      # end for loop 
+    # end for loop ```ith_style, style_path```
+    #   ```content_path, mode, pruning_rate, prune_from_smaller```
+
     df = pd.DataFrame(df_dict)
     wandb.log(
       {
         f"table_layer_{layer_idx}": df,
         **{
           # does not appear filled area without using html format
+          # f"plotly_{fig_notation}":fig 
           f"plotly_{fig_notation}":wandb.Html(fig.to_html()) 
           for fig_notation, fig in plot_utils.get_plotly_fig(
             df,
@@ -189,15 +194,14 @@ def main():
         }
       }
     )
-
-    # TODO : tqdm something
-    # TODO : postorder something
-    # TODO : print level
+  # end for loop 
+  #   ```layer_idx```
   run.finish()
-    
-    
-    
 
+
+# TODO : tqdm something
+# TODO : postorder something
+# TODO : print level
 
 if __name__ == "__main__":
   with torch.no_grad():
